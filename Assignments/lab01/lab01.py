@@ -27,11 +27,18 @@ class GaussianFilt:
         Returns:
             gauss_1d (ndarray): Shape (k_size, 1) — column vector kernel.
         """
-        # Work out the necessary kernel size and range to generate the Gaussian over.
-        raise NotImplementedError("Implement this method")
+        sigma = float(self.sigma)
+        if sigma <= 0:
+            raise ValueError("sigma must be positive.")
+
+        k_size = int(6 * sigma + 1)
+        offsets = np.arange(k_size, dtype=np.float64) - (k_size - 1) / 2.0
+        kernel = np.exp(-(offsets ** 2) / (2.0 * sigma ** 2))
+        kernel /= np.sum(kernel)
+        return np.expand_dims(kernel.astype(np.float64), axis=1)
 
     def my_conv_method(self, image):
-        """Perform separable 2D Gaussian convolution via two 1D matrix-multiply passes.
+        """Perform separable 2D Gaussian convolution via two 1D passes.
 
         Args:
             image (ndarray): 2D greyscale image (H, W), any numeric dtype.
@@ -39,4 +46,15 @@ class GaussianFilt:
         Returns:
             conv_img (ndarray): Blurred image of same shape, dtype uint8.
         """
-        raise NotImplementedError("Implement this method")
+        image_array = np.asarray(image)
+        if image_array.ndim != 2:
+            raise ValueError("Image must be a 2D array.")
+
+        kernel = self.gauss_kernel().ravel()
+        pad = kernel.size // 2
+
+        padded = np.pad(image_array.astype(np.float64), ((pad, pad), (pad, pad)), mode="edge")
+        filtered_x = np.apply_along_axis(lambda row: np.convolve(row, kernel, mode="valid"), 1, padded)
+        filtered_xy = np.apply_along_axis(lambda col: np.convolve(col, kernel, mode="valid"), 0, filtered_x)
+
+        return np.clip(filtered_xy, 0, 255).astype(np.uint8)
